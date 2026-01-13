@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useAccount, useChainId } from "wagmi"
 import { ConnectWalletButton } from "./connect-wallet-button"
+import { ThemeSwitcher } from "./theme-switcher"
 
 export function NavHeader() {
   const { isConnected } = useAccount()
@@ -40,6 +41,17 @@ export function NavHeader() {
             {isConnected && !isCorrectChain && (
               <div className="text-xs bg-destructive/20 text-destructive px-3 py-1 rounded-full">Wrong network</div>
             )}
+            {isConnected && (
+              <>
+                <Link href="/profile" className="text-sm hover:text-primary transition">
+                  Profile
+                </Link>
+                <Link href="/settings" className="text-sm hover:text-primary transition">
+                  Settings
+                </Link>
+              </>
+            )}
+            <ThemeSwitcher />
             <ConnectWalletButton />
           </div>
         </div>
