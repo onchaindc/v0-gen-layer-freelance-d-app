@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { useAccount, useChainId } from "wagmi"
+import { ConnectWalletButton } from "./connect-wallet-button"
 
 export function NavHeader() {
   const { isConnected } = useAccount()
@@ -40,7 +40,7 @@ export function NavHeader() {
             {isConnected && !isCorrectChain && (
               <div className="text-xs bg-destructive/20 text-destructive px-3 py-1 rounded-full">Wrong network</div>
             )}
-            <ConnectButton />
+            <ConnectWalletButton />
           </div>
         </div>
       </div>

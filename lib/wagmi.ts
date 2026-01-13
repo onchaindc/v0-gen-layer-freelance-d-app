@@ -1,33 +1,26 @@
-// lib/wagmi.ts  (or wherever it is)
-'use client';  // Add this at top if missing (makes it client-safe)
+import { createConfig, http } from "wagmi"
+import { mainnet, sepolia } from "viem/chains"
 
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { http } from "viem";
-import { mainnet, sepolia } from "viem/chains";
-
-// GenLayer Asimov testnet configuration (confirmed from GenLayer docs/CLI)
+// GenLayer Asimov testnet configuration
 const genLayerAsimov = {
   id: 61999,
   name: "GenLayer Asimov Testnet",
   nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
   rpcUrls: {
     default: { http: ["https://rpc-asimov.genlayer.com"] },
-    public: { http: ["https://rpc-asimov.genlayer.com"] },  // Optional but helps some clients
+    public: { http: ["https://rpc-asimov.genlayer.com"] },
   },
   blockExplorers: {
     default: { name: "Asimov Explorer", url: "https://explorer-asimov.genlayer.com" },
   },
-  testnet: true,  // Explicit for wagmi/RainbowKit
-} as const;
+  testnet: true,
+} as const
 
-export const config = getDefaultConfig({
-  appName: "GenLayer Freelance Escrow dApp",
-  projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "",  // Remove fallback string – let it error if missing so you notice
-  chains: [genLayerAsimov, sepolia, mainnet],  // Keep fallbacks
-  ssr: true,  // Explicit SSR support for Next.js
+export const config = createConfig({
+  chains: [genLayerAsimov, sepolia, mainnet],
   transports: {
-    [genLayerAsimov.id]: http(),  // http() auto-uses the chain's rpcUrls.default
+    [genLayerAsimov.id]: http(),
     [sepolia.id]: http(),
     [mainnet.id]: http(),
   },
-});
+})
