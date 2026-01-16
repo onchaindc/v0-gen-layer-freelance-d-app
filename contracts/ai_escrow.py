@@ -25,48 +25,60 @@ class AIEscrow(gl.Contract):
     status: TreeMap[u256, str]
     feedback: TreeMap[u256, str]
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.next_job_id = u256(1)
 
-    def _require_job(self, job_id: u256):
+    def _require_job(self, job_id: u256) -> None:
         if job_id not in self.exists or self.exists[job_id] is False:
             raise Exception("Unknown job_id")
 
+    def _as_u256(self, n: int) -> u256:
+        # Defensive: avoid negative ids
+        if n < 0:
+            raise Exception("Negative value not allowed")
+        return u256(n)
+
     # -------- views --------
     @gl.public.view
-    def get_status(self, job_id: u256) -> str:
-        if job_id not in self.exists or self.exists[job_id] is False:
+    def get_status(self, job_id: int) -> str:
+        jid = self._as_u256(job_id)
+        if jid not in self.exists or self.exists[jid] is False:
             return ""
-        return self.status[job_id]
+        return self.status[jid]
 
     @gl.public.view
-    def get_feedback(self, job_id: u256) -> str:
-        if job_id not in self.exists or self.exists[job_id] is False:
+    def get_feedback(self, job_id: int) -> str:
+        jid = self._as_u256(job_id)
+        if jid not in self.exists or self.exists[jid] is False:
             return ""
-        return self.feedback[job_id]
+        return self.feedback[jid]
 
     @gl.public.view
-    def get_submission_url(self, job_id: u256) -> str:
-        if job_id not in self.exists or self.exists[job_id] is False:
+    def get_submission_url(self, job_id: int) -> str:
+        jid = self._as_u256(job_id)
+        if jid not in self.exists or self.exists[jid] is False:
             return ""
-        return self.submission_url[job_id]
+        return self.submission_url[jid]
 
     @gl.public.view
-    def get_brief(self, job_id: u256) -> str:
-        if job_id not in self.exists or self.exists[job_id] is False:
+    def get_brief(self, job_id: int) -> str:
+        jid = self._as_u256(job_id)
+        if jid not in self.exists or self.exists[jid] is False:
             return ""
-        return self.brief[job_id]
+        return self.brief[jid]
 
     # -------- writes --------
     @gl.public.write
-    def post_job(self, brief: str, budget: u256, deadline: str) -> u256:
+    def post_job(self, brief: str, budget: int, deadline: str) -> int:
+        bud = self._as_u256(budget)
+
         job_id = self.next_job_id
         self.next_job_id = job_id + u256(1)
 
         self.exists[job_id] = True
 
         self.brief[job_id] = brief
-        self.budget[job_id] = budget
+        self.budget[job_id] = bud
         self.deadline[job_id] = deadline
 
         self.client[job_id] = "unknown"
@@ -76,33 +88,35 @@ class AIEscrow(gl.Contract):
         self.status[job_id] = STATUS_OPEN
         self.feedback[job_id] = ""
 
-        return job_id
+        # Return as int for schema/ABI compatibility
+        return int(job_id)
 
     @gl.public.write
-    def submit_delivery(self, job_id: u256, url: str):
-        self._require_job(job_id)
+    def submit_delivery(self, job_id: int, url: str) -> None:
+        jid = self._as_u256(job_id)
+        self._require_job(jid)
 
-        s = self.status[job_id]
+        s = self.status[jid]
         if s != STATUS_OPEN and s != STATUS_REVISION:
             raise Exception("Job not accepting submissions")
 
-        self.freelancer[job_id] = "unknown"
-        self.submission_url[job_id] = url
-        self.status[job_id] = STATUS_SUBMITTED
-        self.feedback[job_id] = ""
+        self.freelancer[jid] = "unknown"
+        self.submission_url[jid] = url
+        self.status[jid] = STATUS_SUBMITTED
+        self.feedback[jid] = ""
 
     @gl.public.write
-    def judge(self, job_id: u256) -> str:
-        self._require_job(job_id)
+    def judge(self, job_id: int) -> str:
+        jid = self._as_u256(job_id)
+        self._require_job(jid)
 
-        if self.status[job_id] != STATUS_SUBMITTED:
+        if self.status[jid] != STATUS_SUBMITTED:
             raise Exception("Nothing to judge")
 
-        brief = self.brief[job_id]
-        url = self.submission_url[job_id]
+        brief = self.brief[jid]
+        url = self.submission_url[jid]
 
-        def nd_eval():
-            # Web fetch might not exist in your GenVM, so fallback safely
+        def nd_eval() -> str:
             get_page = getattr(gl, "get_webpage", None)
             if get_page is not None and callable(get_page):
                 evidence = get_page(url, mode="text")
@@ -126,7 +140,6 @@ class AIEscrow(gl.Contract):
                 return "APPROVED|Basic match with brief keywords. " + note
             return "REVISION|Not enough signal to verify brief match. " + note
 
-        # Equivalence principle (module/function variations)
         ep = getattr(gl, "eq_principle_strict_eq", None)
         if ep is None:
             ep = getattr(gl, "eq_principle_strict", None)
@@ -145,18 +158,18 @@ class AIEscrow(gl.Contract):
             result = ep(nd_eval) if callable(ep) else nd_eval()
 
         if result.startswith("APPROVED|"):
-            self.status[job_id] = STATUS_APPROVED
-            self.feedback[job_id] = result[len("APPROVED|") :]
+            self.status[jid] = STATUS_APPROVED
+            self.feedback[jid] = result[len("APPROVED|") :]
             return STATUS_APPROVED
 
         if result.startswith("FAILED|"):
-            self.status[job_id] = STATUS_FAILED
-            self.feedback[job_id] = result[len("FAILED|") :]
+            self.status[jid] = STATUS_FAILED
+            self.feedback[jid] = result[len("FAILED|") :]
             return STATUS_FAILED
 
-        self.status[job_id] = STATUS_REVISION
+        self.status[jid] = STATUS_REVISION
         if result.startswith("REVISION|"):
-            self.feedback[job_id] = result[len("REVISION|") :]
+            self.feedback[jid] = result[len("REVISION|") :]
         else:
-            self.feedback[job_id] = result
+            self.feedback[jid] = result
         return STATUS_REVISION
