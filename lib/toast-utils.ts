@@ -1,28 +1,13 @@
-import { toast } from "sonner"
+import toast from "react-hot-toast"
 
 export const showToast = {
-  success: (message: string, description?: string) => {
-    toast.success(message, { description })
-  },
-  error: (message: string, description?: string) => {
-    toast.error(message, { description })
-  },
-  loading: (message: string) => {
-    return toast.loading(message)
-  },
-  promise: <T,>(
-    promise: Promise<T>,
-    messages: {
-      loading: string
-      success: string | ((data: T) => string)
-      error: string | ((error: Error) => string)
-    },
-  ) => {
-    return toast.promise(promise, messages)
-  },
+  loading: (message: string) => toast.loading(message),
+  success: (title: string, description?: string) =>
+    toast.success(description ? `${title} — ${description}` : title),
+  error: (title: string, description?: string) =>
+    toast.error(description ? `${title} — ${description}` : title),
+  dismiss: (id?: string) => toast.dismiss(id),
 }
 
-export const getTxExplorerUrl = (txHash: string, chainId = 61999) => {
-  const baseUrl = "https://explorer-asimov.genlayer.com"
-  return `${baseUrl}/tx/${txHash}`
-}
+export const getTxExplorerUrl = (txHash: string) =>
+  `https://explorer.genlayer.com/tx/${txHash}`

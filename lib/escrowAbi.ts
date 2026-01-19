@@ -1,0 +1,81 @@
+// lib/escrowAbi.ts
+export const escrowAbi = [
+  {
+    type: "function",
+    name: "post_job",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "brief", type: "string" },
+      { name: "budget", type: "uint256" },
+      { name: "deadline", type: "string" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "submit_delivery",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "job_id", type: "uint256" },
+      { name: "url", type: "string" },
+      { name: "description", type: "string" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "judge",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "job_id", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "get_next_job_id",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "get_status",
+    stateMutability: "view",
+    inputs: [{ name: "job_id", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "get_feedback",
+    stateMutability: "view",
+    inputs: [{ name: "job_id", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "get_submission_url",
+    stateMutability: "view",
+    inputs: [{ name: "job_id", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "get_submission_description",
+    stateMutability: "view",
+    inputs: [{ name: "job_id", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "get_brief",
+    stateMutability: "view",
+    inputs: [{ name: "job_id", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "get_budget",
+    stateMutability: "view",
+    inputs: [{ name: "job_id", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const

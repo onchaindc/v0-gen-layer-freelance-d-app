@@ -1,26 +1,30 @@
+// lib/wagmi.ts
 import { createConfig, http } from "wagmi"
-import { mainnet, sepolia } from "viem/chains"
+import { defineChain } from "viem"
+import { studionet } from "genlayer-js/chains"
 
-// GenLayer Asimov testnet configuration
-const genLayerAsimov = {
-  id: 61999,
-  name: "GenLayer Asimov Testnet",
-  nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
+const genlayerStudio = defineChain({
+  id: studionet.id,
+  name: studionet.name ?? "GenLayer Studio",
+  nativeCurrency: studionet.nativeCurrency ?? { name: "GEN", symbol: "GEN", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://rpc-asimov.genlayer.com"] },
-    public: { http: ["https://rpc-asimov.genlayer.com"] },
+    default: { http: [studionet.rpcUrls.default.http[0]] },
+    public: { http: [studionet.rpcUrls.default.http[0]] },
   },
-  blockExplorers: {
-    default: { name: "Asimov Explorer", url: "https://explorer-asimov.genlayer.com" },
-  },
+  blockExplorers: studionet.blockExplorers
+    ? {
+        default: {
+          name: studionet.blockExplorers.default.name,
+          url: studionet.blockExplorers.default.url,
+        },
+      }
+    : undefined,
   testnet: true,
-} as const
+})
 
 export const config = createConfig({
-  chains: [genLayerAsimov, sepolia, mainnet],
+  chains: [genlayerStudio],
   transports: {
-    [genLayerAsimov.id]: http(),
-    [sepolia.id]: http(),
-    [mainnet.id]: http(),
+    [genlayerStudio.id]: http(genlayerStudio.rpcUrls.default.http[0]),
   },
 })

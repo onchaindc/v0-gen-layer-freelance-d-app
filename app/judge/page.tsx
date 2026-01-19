@@ -1,82 +1,128 @@
 "use client"
 
 import type React from "react"
+import { useMemo, useState } from "react"
+import Link from "next/link"
+import { useAccount } from "wagmi"
 
-import { useState } from "react"
 import { NavHeader } from "@/components/nav-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { useAccount } from "wagmi"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { showToast, getTxExplorerUrl } from "@/lib/toast-utils"
-import Link from "next/link"
-import { toast } from "sonner"
+import { makeGenlayerClient } from "@/lib/genlayerClient"
+
+type OnchainStatus = "OPEN" | "SUBMITTED" | "REVISION" | "APPROVED" | "FAILED" | ""
 
 export default function JudgePage() {
-  const { isConnected } = useAccount()
+  const { isConnected, address } = useAccount()
+  const contractAddress = process.env.NEXT_PUBLIC_ESCROW_CONTRACT_ADDRESS as `0x${string}`
+
   const [jobId, setJobId] = useState("")
+  const [status, setStatus] = useState<OnchainStatus>("")
+  const [feedback, setFeedback] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [txHash, setTxHash] = useState<string | null>(null)
-  const [verdict, setVerdict] = useState<{
-    status: "satisfactory" | "unsatisfactory" | "pending" | null
-    score: number
-    reason: string
-  } | null>(null)
 
-  const handleJudge = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!isConnected || !jobId) {
-      showToast.error("Missing input", "Please enter a job ID")
+  const jobIdNum = useMemo(() => {
+    if (!jobId) return null
+    const n = Number(jobId)
+    if (!Number.isFinite(n) || n <= 0) return null
+    return Math.floor(n)
+  }, [jobId])
+
+  const load = async () => {
+    if (!address || !jobIdNum) return
+    const client = makeGenlayerClient(address)
+
+    const [s, f] = await Promise.all([
+      client.readContract({
+        address: contractAddress,
+        functionName: "get_status",
+        args: [jobIdNum],
+      }),
+      client.readContract({
+        address: contractAddress,
+        functionName: "get_feedback",
+        args: [jobIdNum],
+      }),
+    ])
+
+    setStatus((s as any) || "")
+    setFeedback((f as any) || "")
+  }
+
+  const handleRefresh = async () => {
+    if (!isConnected || !address) {
+      showToast.error("Wallet not connected", "Connect wallet first")
+      return
+    }
+    if (!contractAddress) {
+      showToast.error("Missing contract address", "Set NEXT_PUBLIC_ESCROW_CONTRACT_ADDRESS in .env.local")
+      return
+    }
+    if (!jobIdNum) {
+      showToast.error("Invalid Job ID", "Enter a valid job ID")
       return
     }
 
     setIsLoading(true)
-    const toastId = showToast.loading("Judging job...")
-
+    const t = showToast.loading("Refreshing...")
     try {
-      // TODO: Integrate GenLayerJS
-      // const contract = client.getContract({ address: '0xYourContractAddress', abi: [...] })
-      // const result = await contract.read.judgeJob([BigInt(jobId)])
-
-      toast.dismiss(toastId)
-      // Mock verdict for demo
-      setVerdict({
-        status: "satisfactory",
-        score: 8,
-        reason: "Work meets all requirements and specifications",
-      })
-      showToast.success("Verdict retrieved", "Job has been judged")
-    } catch (error) {
-      toast.dismiss(toastId)
-      const errorMessage = error instanceof Error ? error.message : "Failed to judge job"
-      showToast.error("Error judging job", errorMessage)
-      console.error("Error judging job:", error)
+      await load()
+      showToast.dismiss(t)
+      showToast.success("Refreshed", "Latest status loaded")
+    } catch (e) {
+      showToast.dismiss(t)
+      showToast.error("Refresh failed", e instanceof Error ? e.message : "Failed")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleReleaseFunds = async () => {
-    if (!isConnected || !jobId) return
+  const handleJudge = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!isConnected || !address) {
+      showToast.error("Wallet not connected", "Connect wallet first")
+      return
+    }
+    if (!contractAddress) {
+      showToast.error("Missing contract address", "Set NEXT_PUBLIC_ESCROW_CONTRACT_ADDRESS in .env.local")
+      return
+    }
+    if (!jobIdNum) {
+      showToast.error("Invalid Job ID", "Enter a valid job ID")
+      return
+    }
 
     setIsLoading(true)
-    const toastId = showToast.loading("Releasing funds...")
+    setTxHash(null)
+
+    const toastId = showToast.loading("Confirm judge transaction in wallet...")
 
     try {
-      // TODO: Integrate GenLayerJS
-      // const contract = client.getContract({ address: '0xYourContractAddress', abi: [...] })
-      // const tx = await contract.write.releaseFunds([BigInt(jobId)])
+      const client = makeGenlayerClient(address)
 
-      const mockTxHash = "0x" + Math.random().toString(16).substring(2, 66)
-      setTxHash(mockTxHash)
+      const hash = await client.writeContract({
+        address: contractAddress,
+        functionName: "judge",
+        args: [jobIdNum],
+        value: 0n,
+      })
 
-      toast.dismiss(toastId)
-      showToast.success("Funds released successfully!", `Tx: ${mockTxHash.substring(0, 10)}...`)
+      setTxHash(hash)
+
+      showToast.dismiss(toastId)
+      showToast.success("Judge sent", `Tx: ${hash.slice(0, 10)}...`)
+
+      // After sending judge, refresh reads
+      await load()
     } catch (error) {
-      toast.dismiss(toastId)
-      const errorMessage = error instanceof Error ? error.message : "Failed to release funds"
-      showToast.error("Error releasing funds", errorMessage)
-      console.error("Error releasing funds:", error)
+      showToast.dismiss(toastId)
+      const msg = error instanceof Error ? error.message : "Judge failed"
+      showToast.error("Judge failed", msg)
+      console.error(error)
     } finally {
       setIsLoading(false)
     }
@@ -86,7 +132,7 @@ export default function JudgePage() {
     return (
       <>
         <NavHeader />
-        <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        <main className="mx-auto max-w-7xl px-4 py-12">
           <p className="text-center text-muted-foreground py-12">Please connect your wallet first.</p>
         </main>
       </>
@@ -96,12 +142,13 @@ export default function JudgePage() {
   return (
     <>
       <NavHeader />
-      <main className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-12">
+      <main className="mx-auto max-w-2xl px-4 py-12">
         <Card>
           <CardHeader>
-            <CardTitle>Judge & Payout</CardTitle>
-            <CardDescription>Review delivery and release funds</CardDescription>
+            <CardTitle>Judge</CardTitle>
+            <CardDescription>Studio demo: anyone can trigger AI consensus verdict</CardDescription>
           </CardHeader>
+
           <CardContent className="space-y-6">
             <form onSubmit={handleJudge} className="space-y-4">
               <div>
@@ -118,56 +165,37 @@ export default function JudgePage() {
               </div>
 
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Judging..." : "Get Verdict"}
+                {isLoading ? "Working..." : "Judge"}
               </Button>
             </form>
 
-            {verdict && (
-              <div className="border rounded-lg p-4 bg-card space-y-4">
-                <h3 className="font-semibold">Verdict</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Status:</span>
-                    <span
-                      className={`font-semibold px-2 py-1 rounded text-sm ${
-                        verdict.status === "satisfactory"
-                          ? "bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100"
-                          : "bg-orange-100 dark:bg-orange-950 text-orange-900 dark:text-orange-100"
-                      }`}
-                    >
-                      {verdict.status?.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Score:</span>
-                    <span className="font-semibold">{verdict.score}/10</span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">Reason:</span>
-                    <p className="mt-1 text-sm">{verdict.reason}</p>
-                  </div>
-                </div>
+            <Button variant="secondary" className="w-full" onClick={handleRefresh} disabled={isLoading || !jobIdNum}>
+              Refresh Status
+            </Button>
 
-                {verdict.status === "satisfactory" && (
-                  <>
-                    <Button onClick={handleReleaseFunds} className="w-full" disabled={isLoading}>
-                      {isLoading ? "Releasing..." : "Release Funds"}
-                    </Button>
-                    {txHash && (
-                      <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-                        <p className="text-sm font-medium text-green-900 dark:text-green-100">Funds released</p>
-                        <Link
-                          href={getTxExplorerUrl(txHash)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-green-700 dark:text-green-300 hover:underline break-all"
-                        >
-                          View on Explorer →
-                        </Link>
-                      </div>
-                    )}
-                  </>
-                )}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                <span className="font-semibold">{status || "-"}</span>
+              </div>
+
+              <div>
+                <span className="text-sm text-muted-foreground">Feedback:</span>
+                <p className="mt-1 text-sm whitespace-pre-wrap">{feedback || "-"}</p>
+              </div>
+            </div>
+
+            {txHash && (
+              <div className="rounded-lg border p-3">
+                <p className="text-sm font-medium">Transaction</p>
+                <Link
+                  href={getTxExplorerUrl(txHash as any)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm hover:underline break-all"
+                >
+                  View →
+                </Link>
               </div>
             )}
           </CardContent>
